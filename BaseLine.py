@@ -6,7 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # First section takes care of preparing the data to feed the model
-# It is the same for all model
+# It is the same for all models
+
 # Fixing format of the data
 def enc_label(label):
     code = 0
@@ -21,40 +22,47 @@ def enc_label(label):
     return code
 
 # Define hyperparameters
-IMG_SIZE = 224
 BATCH_SIZE = 64
 EPOCHS = 10
 
-MAX_SEQ_LENGTH = 30   # number of frames
+MAX_SEQ_LENGTH = 30   # number of frames per figure
 NUM_FEATURES = 50     # number of join coordinates
-no_sample = 10
+no_sample = 20        # number of examples
 
 # Import the data
-PATH_DATA = "../Model-test/Data.csv"
+PATH_DATA = "Data_concat.csv"
 data = pd.read_csv(PATH_DATA)
 
-# Exploratory analysis number of clases
+# Exploratory analysis number of classes
 
 # Data preprocessing, get the input X and the label y
 ind_start = data[data['status'] == "S"].index.tolist()
 ind_end = data[data['status'] == "E"].index.tolist()
 
-# Take an interval between consecutive "S", one example
+# Take intervals between consecutive "S", they define one figure
 X = []
 y = []
 
 for i in range(no_sample):
-    X.append(data.iloc[ind_start[i]: ind_end[i], 3:-2])
+    X.append(data.iloc[ind_start[i]: ind_end[i], 3:-2])  # the (visibility ) is included
     y.append(data.loc[ind_start[i], 'label'])
 
-# select 10 frames from the interval TODO should be uniform
+# select frames from the interval TODO should be uniform
 ind_samp = []
 
 for i in range(no_sample):
-    aux = np.random.randint(ind_start[i], ind_end[i], MAX_SEQ_LENGTH)
-    aux.sort()
+    # Uniform
+    aux = np.linspace(ind_start[i]
+                      , ind_end[i]
+                      , MAX_SEQ_LENGTH
+                      , endpoint=False).astype(int)
+
+    # random
+    # aux = np.random.randint(ind_start[i], ind_end[i], MAX_SEQ_LENGTH)
+    # aux.sort()
     ind_samp.append(aux)
-# TODO: make sure number are not repeated. Better to uniform sample the interval
+
+# TODO: decide between random and uniform sampling
 
 # Changing format of the data to be compatible with Tensor Flow
 X_train = [x.loc[ind_samp[ind], :].to_numpy() for (ind, x) in enumerate(X)]
@@ -89,7 +97,10 @@ history = model.fit(
     validation_data=(X_train, y_train)
 )
 
+# Plot "training accuracy for this model"
+
 # Prediction example
+# TODO: print predict probabilities
 pred = model.predict( np.expand_dims(X_train[0], axis=0) )
 print(f"Pred {pred}: Real Label {y_train[0]}")
 # Save the model
