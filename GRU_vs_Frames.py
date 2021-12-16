@@ -1,9 +1,11 @@
+# Try to import Time distributed layer
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import models, layers
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import logging
 
 # Fixing format of the label
 def enc_label(label):
@@ -19,11 +21,9 @@ def enc_label(label):
     return code
 
 # Define hyperparameters
-BATCH_SIZE = 64
+BATCH_SIZE = 8
 EPOCHS = 100
-MAX_SEQ_LENGTH = 40   # number of frames per figure
 NUM_FEATURES = 75     # number of join coordinates
-no_sample = 20        # number of examples
 
 # Import the data
 PATH_DATA_TRAIN = "Data_train_validate/Data_train_norm.csv"
@@ -31,9 +31,7 @@ PATH_DATA_VAL = "Data_train_validate/Data_val_norm.csv"
 data_train = pd.read_csv(PATH_DATA_TRAIN)
 data_val = pd.read_csv(PATH_DATA_VAL)
 
-
 # Function to select a number of frames per figure and right in the correct format for the mdoel
-
 def transf_data(data):
     # Data preprocessing, get the input X and the label y
     ind_start = data[data['status'] == "S"].index.tolist()
@@ -44,7 +42,7 @@ def transf_data(data):
     y = []
 
     for i in range(len(ind_start) - 1):
-        X.append(data.iloc[ind_start[i]: ind_end[i], 4:-3])  # the last 25 (visibility ) + 2
+        X.append(data.iloc[ind_start[i]: ind_end[i], 4:-3])  # - 3 the last 25 (visibility ) + 2
         y.append(data.loc[ind_start[i], 'label'])
 
     # select frames from the interval
@@ -72,50 +70,60 @@ def transf_data(data):
 
     return X, y
 
+# Utility for running experiments.
+def run_experiment():
+    filepath = "temp/"
+    checkpoint = keras.callbacks.ModelCheckpoint(
+        filepath, save_weights_only=True, save_best_only=True, verbose=1
+    )
+    # Build the model
+    model = models.Sequential()
+    model.add(layers.InputLayer(input_shape=(MAX_SEQ_LENGTH, NUM_FEATURES)))
+    model.add(layers.GRU(64, return_sequences=True))
+    model.add(layers.Dropout(0.6))
+    model.add(layers.GRU(32))
+    model.add(layers.Dense(32, activation="relu"))
+    model.add(layers.Dense(5, activation="softmax"))
+
+    # Compile the model
+    model.compile(
+        optimizer="adam",
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+
+    # Check the trainning accuracy
+    history = model.fit(
+        X_train,
+        y_train,
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        validation_data=(X_val, y_val),
+        callbacks=[checkpoint],
+    )
+
+    model.load_weights(filepath)
+    _, accuracy = model.evaluate( X_val, y_val)
+    print(f"Test accuracy: {round(accuracy * 100, 2)}%")
+
+    return history, model, accuracy
+
+# Running experiments as a function of the number of frames
+Frame_list = [20, 25, 30, 35, 40, 50, 60, 70, 80, 90]
+Acc_list = []
+MAX_SEQ_LENGTH = 40   # number of frames per figure
+
 # Train set
-X_train, y_train = transf_data(data_train)
-X_val, y_val = transf_data(data_val)
+for ind_i, i in enumerate(Frame_list):
+    MAX_SEQ_LENGTH = i
+    print(f"Frames {i}")
+    X_train, y_train = transf_data(data_train)
+    X_val, y_val = transf_data(data_val)
+    _, sequence_model, acc_frame = run_experiment()
+    Acc_list.append(acc_frame)
 
-# Build the model
-# TODO: use functional way to build the model
-# eg: https://keras.io/examples/vision/video_classification/ (The sequence model)
-model = models.Sequential()
-model.add(layers.Flatten(input_shape=(MAX_SEQ_LENGTH, NUM_FEATURES)))
-model.add(layers.Dense(128, activation="relu"))
-model.add(layers.Dense(64, activation="relu"))
-model.add(layers.Dense(5, activation="softmax"))
-model.summary()
-
-# Compile the model
-model.compile(
-    optimizer="adam",
-    loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"]
-)
-
-# Check the trainning accuracy
-history = model.fit(
-    X_train,
-    y_train,
-    epochs=EPOCHS,
-    batch_size=5,
-    validation_data=(X_val, y_val)
-)
-
-# Checking accuracies
-def render_history(history):
-    plt.plot(history["loss"], label="loss")
-    plt.plot(history["val_loss"], label="val_loss")
-    plt.legend()
-    plt.title("Train losses")
-    plt.show()
-    plt.close()
-
-    plt.plot(history["accuracy"], label="accuracy")
-    plt.plot(history["val_accuracy"], label="val_accuracy")
-    plt.legend()
-    plt.title("Train accuracies")
-    plt.show()
-    plt.close()
-
-render_history(history.history)
+# Saving the figure
+plt.plot(Frame_list, Acc_list, marker="o")
+plt.xlabel('Number of Frames')
+plt.ylabel('Accuracy ')
+plt.savefig("temp/Acc_Frame.jpg")

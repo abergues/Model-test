@@ -1,3 +1,4 @@
+# Try to import Time distributed layer
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import models, layers
@@ -19,8 +20,8 @@ def enc_label(label):
     return code
 
 # Define hyperparameters
-BATCH_SIZE = 64
-EPOCHS = 100
+BATCH_SIZE = 8
+EPOCHS = 150
 MAX_SEQ_LENGTH = 40   # number of frames per figure
 NUM_FEATURES = 75     # number of join coordinates
 no_sample = 20        # number of examples
@@ -77,12 +78,9 @@ X_train, y_train = transf_data(data_train)
 X_val, y_val = transf_data(data_val)
 
 # Build the model
-# TODO: use functional way to build the model
-# eg: https://keras.io/examples/vision/video_classification/ (The sequence model)
 model = models.Sequential()
-model.add(layers.Flatten(input_shape=(MAX_SEQ_LENGTH, NUM_FEATURES)))
-model.add(layers.Dense(128, activation="relu"))
-model.add(layers.Dense(64, activation="relu"))
+model.add(layers.InputLayer(input_shape=(MAX_SEQ_LENGTH, NUM_FEATURES)))
+model.add(layers.GRU(64))
 model.add(layers.Dense(5, activation="softmax"))
 model.summary()
 
@@ -98,7 +96,7 @@ history = model.fit(
     X_train,
     y_train,
     epochs=EPOCHS,
-    batch_size=5,
+    batch_size=BATCH_SIZE,
     validation_data=(X_val, y_val)
 )
 
@@ -107,15 +105,19 @@ def render_history(history):
     plt.plot(history["loss"], label="loss")
     plt.plot(history["val_loss"], label="val_loss")
     plt.legend()
-    plt.title("Train losses")
+    plt.title("Losses")
     plt.show()
     plt.close()
 
     plt.plot(history["accuracy"], label="accuracy")
     plt.plot(history["val_accuracy"], label="val_accuracy")
     plt.legend()
-    plt.title("Train accuracies")
+    plt.title("Accuracies")
     plt.show()
     plt.close()
 
 render_history(history.history)
+
+# Prediction example
+pred = model.predict( np.expand_dims(X_train[0], axis=0) )
+print(f"Pred {pred}: Real Label {y_train[0]}")

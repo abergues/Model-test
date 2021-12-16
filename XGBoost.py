@@ -1,6 +1,3 @@
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import models, layers
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -76,46 +73,5 @@ def transf_data(data):
 X_train, y_train = transf_data(data_train)
 X_val, y_val = transf_data(data_val)
 
-# Build the model
-# TODO: use functional way to build the model
-# eg: https://keras.io/examples/vision/video_classification/ (The sequence model)
-model = models.Sequential()
-model.add(layers.Flatten(input_shape=(MAX_SEQ_LENGTH, NUM_FEATURES)))
-model.add(layers.Dense(128, activation="relu"))
-model.add(layers.Dense(64, activation="relu"))
-model.add(layers.Dense(5, activation="softmax"))
-model.summary()
+# XGBoost model
 
-# Compile the model
-model.compile(
-    optimizer="adam",
-    loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"]
-)
-
-# Check the trainning accuracy
-history = model.fit(
-    X_train,
-    y_train,
-    epochs=EPOCHS,
-    batch_size=5,
-    validation_data=(X_val, y_val)
-)
-
-# Checking accuracies
-def render_history(history):
-    plt.plot(history["loss"], label="loss")
-    plt.plot(history["val_loss"], label="val_loss")
-    plt.legend()
-    plt.title("Train losses")
-    plt.show()
-    plt.close()
-
-    plt.plot(history["accuracy"], label="accuracy")
-    plt.plot(history["val_accuracy"], label="val_accuracy")
-    plt.legend()
-    plt.title("Train accuracies")
-    plt.show()
-    plt.close()
-
-render_history(history.history)
